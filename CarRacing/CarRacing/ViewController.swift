@@ -10,15 +10,17 @@ import UIKit
 
 typealias JSON = [String: Any]
 class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
-   
+    
     var raceArray = [String] ()
     var raceDict = [String:Any]()
-   
+    
     @IBOutlet weak var racingListTableView: UITableView!
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-    
+        
+        self.racingListTableView.delegate  = self
+        self.racingListTableView.dataSource = self
         
         let carRacingURL: String = "http://ergast.com/api/f1/current.json"
         guard let url = URL(string: carRacingURL) else {
@@ -26,9 +28,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             return
         }
         let urlRequest = URLRequest(url: url)
-        
-        print("\(urlRequest)")
-        
         // set up the session
         let session = URLSession.shared
         
@@ -47,25 +46,19 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                 return
             }
             // parse the result as JSON, since that's what the API provides
-            do {
-                let json = try JSONSerialization.jsonObject(with: responseData, options: []) as? JSON
-
-                self.raceDict = ((json?["MRData"] as? JSON)?["RaceTable"] as? JSON)  as! JSON
-         
-                let raceList = self.raceDict["Races"]
-              
- 
             
-            } catch  {
-                print("error trying to convert data to JSON")
-                return
-            }
+                let jsondata = try! JSONDecoder().decode(CarRacing.self, from: responseData)
+                let abc = jsondata.mrData.raceTable.races
+                self.raceArray = abc.map{$0.circuit.location.locality}
+                self.racingListTableView.reloadData()
         }
         task.resume()
+        
     }
     
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+       
         return raceArray.count
     }
     
@@ -79,40 +72,65 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
     }
 }
 
-//Pragma mark :: Data Models
 
-struct RaceJsonData {
+struct CarRacing: Codable {
     let mrData: MRData
-}
-
-struct MRData {
-    let xmlns: String
-    let series: String
-    let url: String
-    let limit, offset, total: String
-    let raceTable: RaceTable
-}
-
-struct RaceTable {
-    let season: String
-    let races: [Race]
-}
-
-struct Race {
-    let season, round: String
-    let url: String
-    let raceName: String
-    let circuit: Circuit
-    let date, time: String
-}
-
-struct Circuit {
-    let circuitID: String
-    let url: String
-    let circuitName: String
-    let location: Location
-}
-
-struct Location {
-    let lat, long, locality, country: String
+    
+    enum CodingKeys: String, CodingKey {
+        case mrData = "MRData"
+    }
+    
+    struct MRData: Codable {
+        let xmlns: String
+        let series: String
+        let url: String
+        let limit, offset, total: String
+        let raceTable: RaceTable
+        
+        enum CodingKeys: String, CodingKey {
+            case xmlns, series, url, limit, offset, total
+            case raceTable = "RaceTable"
+        }
+    }
+    
+    struct RaceTable: Codable {
+        let season: String
+        let races: [Race]
+        
+        enum CodingKeys: String, CodingKey {
+            case season
+            case races = "Races"
+        }
+    }
+    
+    struct Race: Codable {
+        let season, round: String
+        let url: String
+        let raceName: String
+        let circuit: Circuit
+        let date, time: String
+        
+        enum CodingKeys: String, CodingKey {
+            case season, round, url, raceName
+            case circuit = "Circuit"
+            case date, time
+        }
+    }
+    
+    struct Circuit: Codable {
+        let circuitID: String
+        let url: String
+        let circuitName: String
+        let location: Location
+        
+        enum CodingKeys: String, CodingKey {
+            case circuitID = "circuitId"
+            case url, circuitName
+            case location = "Location"
+        }
+    }
+    
+    struct Location: Codable {
+        let lat, long, locality, country: String
+    }
 }
